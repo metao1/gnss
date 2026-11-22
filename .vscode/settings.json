@@ -1,0 +1,10 @@
+{
+        "nrf-connect.applications": [
+                "${workspaceFolder}"
+        ],
+        "nrf-connect.debugging.bindings": {
+                "${workspaceFolder}/build": "Launch gnss/build",
+                "${workspaceFolder}/build/gnss": "Launch gnss/build/gnss",
+                "${workspaceFolder}/build/gnss/tfm": "Launch gnss/build/gnss/tfm"
+        }
+}

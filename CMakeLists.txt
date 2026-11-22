@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2019 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+cmake_minimum_required(VERSION 3.20.0)
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(gnss_sample)
+
+zephyr_library_sources(src/main.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_BLE_ENABLED src/gnss_ble.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_UART_BRIDGE_ENABLED src/gnss_uart_bridge.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_MQTT_NBIOT_ENABLED src/cloud_config.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_MQTT_NBIOT_ENABLED src/telemetry_service.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_MQTT_NBIOT_ENABLED src/mqtt_nbiot_transport.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_CELLULAR_FALLBACK_ENABLED src/location_service.c)
+
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_NRF_CLOUD src/assistance.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_SUPL src/assistance_supl.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_MINIMAL src/assistance_minimal.c)
+zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_MINIMAL src/mcc_location_table.c)

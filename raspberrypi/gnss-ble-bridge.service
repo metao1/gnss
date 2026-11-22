@@ -1,0 +1,15 @@
+[Unit]
+Description=nRF GNSS serial to Raspberry Pi BLE GATT bridge
+After=bluetooth.target
+Requires=bluetooth.target
+
+[Service]
+Type=simple
+User=mehrdad
+SupplementaryGroups=dialout
+ExecStart=/usr/bin/python3 /opt/gnss/gnss_ble_bridge.py --serial /dev/serial/by-id/usb-SEGGER_J-Link_001052045443-if00 --baud 115200
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

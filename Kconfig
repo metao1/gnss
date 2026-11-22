@@ -1,0 +1,645 @@
+#
+# Copyright (c) 2020 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+
+menu "GNSS sample"
+
+choice
+	default GNSS_SAMPLE_MODE_CONTINUOUS
+	prompt "Select GNSS operation mode"
+
+config GNSS_SAMPLE_MODE_CONTINUOUS
+	bool "Continuous tracking"
+
+config GNSS_SAMPLE_MODE_PERIODIC
+	bool "Periodic fixes"
+
+config GNSS_SAMPLE_MODE_TTFF_TEST
+	bool "Time-to-first-fix (TTFF) test mode"
+	select GNSS_SAMPLE_NMEA_ONLY
+
+endchoice
+
+if GNSS_SAMPLE_MODE_PERIODIC
+
+config GNSS_SAMPLE_PERIODIC_INTERVAL
+	int "Fix interval for periodic fixes"
+	range 10 65535
+	default 120
+	help
+	  Fix interval (in seconds) for periodic fixes.
+
+config GNSS_SAMPLE_PERIODIC_TIMEOUT
+	int "Fix timeout for periodic fixes"
+	range 0 65535
+	default 120
+	help
+	  Fix timeout (in seconds) for periodic fixes.
+	  If set to zero, GNSS is allowed to run indefinitely until a valid PVT estimate is produced.
+
+endif # GNSS_SAMPLE_MODE_PERIODIC
+
+if GNSS_SAMPLE_MODE_TTFF_TEST
+
+config GNSS_SAMPLE_MODE_TTFF_TEST_COLD_START
+	bool "Delete GNSS data before each start (cold start)"
+	help
+	  When enabled, deletes all stored data from GNSS to force a cold start every time GNSS is started.
+
+config GNSS_SAMPLE_MODE_TTFF_TEST_INTERVAL
+	int "Time to wait between TTFF tests in seconds"
+	range 1 604800
+	default 120
+
+endif # GNSS_SAMPLE_MODE_TTFF_TEST
+
+config GNSS_SAMPLE_NMEA_ONLY
+	bool "Output only NMEA strings"
+	help
+	  Outputs only NMEA strings from the GNSS.
+
+endmenu
+
+choice
+	default GNSS_SAMPLE_ASSISTANCE_NONE
+	prompt "Select whether GNSS assistance is used or not"
+
+config GNSS_SAMPLE_ASSISTANCE_NONE
+	bool "Assistance not used"
+
+config GNSS_SAMPLE_ASSISTANCE_NRF_CLOUD
+	bool "Use nRF Cloud A-GNSS"
+	select NRF_CLOUD_REST
+	imply NRF_CLOUD_AGNSS
+	select MODEM_JWT
+	select MODEM_INFO
+	select DATE_TIME
+
+config GNSS_SAMPLE_ASSISTANCE_SUPL
+	bool "Use SUPL assistance"
+	select SUPL_CLIENT_LIB
+
+config GNSS_SAMPLE_ASSISTANCE_MINIMAL
+	bool "Use factory almanac, LTE network time and MCC based location"
+	select GNSS_SAMPLE_LTE_ON_DEMAND
+	select SETTINGS
+	select FCB
+	select FLASH
+	select FLASH_MAP
+
+endchoice
+
+if !GNSS_SAMPLE_ASSISTANCE_NONE
+
+config GNSS_SAMPLE_LTE_ON_DEMAND
+	bool "LTE is activated only when needed to fetch A-GNSS data"
+	depends on !NRF_CLOUD_PGPS
+	help
+	  Activates LTE only when it is needed to fetch A-GNSS data. This is not supported when
+	  P-GPS is enabled.
+
+endif # !GNSS_SAMPLE_ASSISTANCE_NONE
+
+if GNSS_SAMPLE_ASSISTANCE_SUPL
+
+config GNSS_SAMPLE_SUPL_HOSTNAME
+	string "SUPL server hostname"
+	help
+	  SUPL server hostname.
+
+config GNSS_SAMPLE_SUPL_PORT
+	int "SUPL server port number"
+	range 0 65535
+	default 7275 if GNSS_SAMPLE_SUPL_SEC_TAG > 0
+	default 7276
+	help
+	  SUPL server port number. The OMA UserPlane Location Protocol (ULP) port number is 7275,
+	  but some servers are known to use port 7276 for non-TLS connections.
+
+config GNSS_SAMPLE_SUPL_SEC_TAG
+	int "Security tag for connection to the SUPL server"
+	range 0 2147483667
+	default 0
+	help
+	  Set a non-zero value to use TLS for connection to the SUPL server. When TLS is enabled,
+	  a root CA certificate must be stored on the modem.
+
+endif # GNSS_SAMPLE_ASSISTANCE_SUPL
+
+if GNSS_SAMPLE_MODE_CONTINUOUS
+
+choice
+	default GNSS_SAMPLE_POWER_SAVING_DISABLED
+	prompt "Select GNSS power saving mode (duty-cycling)"
+
+config GNSS_SAMPLE_POWER_SAVING_DISABLED
+	bool "No power saving"
+
+config GNSS_SAMPLE_POWER_SAVING_MODERATE
+	bool "Power saving without significant performance degradation"
+
+config GNSS_SAMPLE_POWER_SAVING_HIGH
+	bool "Power saving with acceptable performance degradation"
+
+endchoice
+
+endif # GNSS_SAMPLE_MODE_CONTINUOUS
+
+config GNSS_SAMPLE_REFERENCE_LATITUDE
+	string "Reference position latitude in decimal degrees"
+	help
+	  When set, the sample calculates the distance from the reference position for each fix.
+	  Given in decimal degrees (DD), for example "61.500000".
+
+config GNSS_SAMPLE_REFERENCE_LONGITUDE
+	string "Reference position longitude in decimal degrees"
+	help
+	  When set, the sample calculates the distance from the reference position for each fix.
+	  Given in decimal degrees (DD), for example "23.800000".
+
+config GNSS_SAMPLE_LOW_ACCURACY
+	bool "Allow low accuracy fixes"
+	help
+	  Allows fixes with lower accuracy.
+
+config GNSS_SAMPLE_MIN_SATELLITES_IN_FIX
+	int "Minimum satellites used in fix (0 to disable)"
+	range 0 32
+	default 0
+	help
+	  Rejects valid fixes that use fewer satellites than this threshold.
+	  Set to 0 to disable filtering.
+
+config GNSS_SAMPLE_MAX_HDOP
+	int "Maximum HDOP in tenths (0 to disable)"
+	range 0 1000
+	default 0
+	help
+	  Rejects valid fixes with HDOP higher than this threshold.
+	  Example: value 25 means HDOP <= 2.5 is accepted.
+	  Set to 0 to disable filtering.
+
+config GNSS_SAMPLE_BLE_ENABLED
+	bool "Enable BLE streaming interface"
+	depends on BT_CTLR
+	select BT
+	select BT_PERIPHERAL
+	select BT_GATT_DYNAMIC_DB
+	select BT_DEVICE_NAME_DYNAMIC
+	help
+	  Enables custom BLE service to stream GNSS JSON frames and accept control commands.
+
+if GNSS_SAMPLE_BLE_ENABLED
+
+config GNSS_SAMPLE_BLE_DEVICE_NAME
+	string "BLE device name"
+	default "GNSS-DK"
+	help
+	  BLE advertising name presented to mobile applications.
+
+config GNSS_SAMPLE_BLE_STREAM_RATE_HZ
+	int "BLE GNSS stream rate (Hz)"
+	range 1 5
+	default 1
+	help
+	  Rate of GNSS JSON notifications sent over BLE.
+
+config GNSS_SAMPLE_BLE_TX_QUEUE_LEN
+	int "BLE transmit queue length"
+	range 2 32
+	default 8
+	help
+	  Number of pending BLE payload slots. Oldest is dropped on overflow.
+
+endif # GNSS_SAMPLE_BLE_ENABLED
+
+config GNSS_SAMPLE_UART_BRIDGE_ENABLED
+	bool "Enable UART bridge for external Bluetooth serial module"
+	default y
+	select SERIAL
+	select UART_INTERRUPT_DRIVEN
+	help
+	  Streams newline-delimited GNSS JSON frames over a secondary UART and
+	  accepts simple text commands from an external serial/Bluetooth module.
+
+if GNSS_SAMPLE_UART_BRIDGE_ENABLED
+
+config GNSS_SAMPLE_UART_BRIDGE_STREAM_RATE_HZ
+	int "UART bridge GNSS stream rate (Hz)"
+	range 1 5
+	default 1
+	help
+	  Rate of GNSS JSON lines sent over the external UART bridge.
+
+endif # GNSS_SAMPLE_UART_BRIDGE_ENABLED
+
+config GNSS_SAMPLE_CONSOLE_OUTPUT_ENABLED
+	bool "Enable periodic GNSS console output"
+	default y
+	help
+	  Prints periodic PVT and NMEA data to the USB serial console.
+
+config GNSS_SAMPLE_GNSS_ENABLED
+	bool "Enable GNSS modem operation"
+	default y
+	help
+	  Initializes and starts the modem GNSS engine. Disable for a modem-only
+	  build that does not consume GNSS PVT or NMEA data.
+
+config GNSS_SAMPLE_MQTT_NBIOT_ENABLED
+	bool "Enable NB-IoT MQTT telemetry transport"
+	select MQTT_LIB
+	select NET_SOCKETS
+	select NET_SOCKETS_OFFLOAD
+	help
+	  Adds a non-blocking NB-IoT MQTT publisher. BLE and UART transports
+	  continue independently. MQTT publishes compact JSON from a location
+	  priority chain: GNSS first, then cellular fallback, then last known.
+
+config GNSS_SAMPLE_CELLULAR_FALLBACK_ENABLED
+	bool "Enable cellular location fallback when GNSS has no valid fix"
+	depends on GNSS_SAMPLE_MQTT_NBIOT_ENABLED
+	default y
+	help
+	  Enables cell-tower based location estimation fallback for MQTT
+	  telemetry when GNSS has no accepted valid fix. GNSS remains primary.
+	  Cellular location is approximate and is marked as source=cellular.
+
+if GNSS_SAMPLE_MQTT_NBIOT_ENABLED
+
+if GNSS_SAMPLE_CELLULAR_FALLBACK_ENABLED
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_REQUEST_INTERVAL_SECONDS
+	int "Cellular fallback request interval in seconds"
+	range 15 3600
+	default 120
+	help
+	  Minimum interval between new cellular location requests while GNSS
+	  fix is not valid. Keeps NB-IoT usage bounded.
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_TIMEOUT_SECONDS
+	int "Cellular fallback HTTP request timeout in seconds"
+	range 10 300
+	default 45
+	help
+	  Timeout for one cellular location lookup request to the backend API.
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_CELL_COUNT
+	int "Cellular fallback requested cell count"
+	range 1 15
+	default 4
+	help
+	  Number of cells requested in %NCELLMEAS command before sending
+	  data to the backend resolver.
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_API_HOSTNAME
+	string "Cellular location backend hostname"
+	default "example.com"
+	help
+	  Backend hostname that resolves cellular measurements into
+	  approximate coordinates.
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_API_PORT
+	int "Cellular location backend port"
+	range 1 65535
+	default 80
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_API_PATH
+	string "Cellular location backend path"
+	default "/api/cell-loc"
+	help
+	  HTTP path on the backend API endpoint.
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_API_AUTH_HEADER
+	string "Optional Authorization header value"
+	default ""
+	help
+	  Optional full Authorization header value, for example:
+	  "Bearer eyJ...". Leave empty if not needed.
+
+config GNSS_SAMPLE_CELLULAR_LOCATION_WORKQ_STACK_SIZE
+	int "Cellular fallback worker stack size"
+	default 4096
+
+endif # GNSS_SAMPLE_CELLULAR_FALLBACK_ENABLED
+
+config GNSS_SAMPLE_MQTT_APN
+	string "NB-IoT APN"
+	default "internet.m2mportal.de"
+	help
+	  APN expected for the default PDP context. Set matching LTE_LC/PDN
+	  defaults in prj.conf so the modem uses this APN for CID 0.
+
+config GNSS_SAMPLE_MQTT_BROKER_HOSTNAME
+	string "MQTT broker hostname"
+	default "test.mosquitto.org"
+	help
+	  MQTT broker hostname for telemetry publishing.
+
+config GNSS_SAMPLE_MQTT_BROKER_PORT
+	int "MQTT broker port"
+	range 1 65535
+	default 8883 if GNSS_SAMPLE_MQTT_TLS_ENABLED
+	default 1883
+
+config GNSS_SAMPLE_MQTT_TLS_ENABLED
+	bool "Enable MQTT over TLS (MQTTS)"
+	default y
+	help
+	  Enables secure MQTT transport with TLS. Recommended for NB-IoT
+	  deployments where plain port 1883 may be filtered.
+
+if GNSS_SAMPLE_MQTT_TLS_ENABLED
+
+config GNSS_SAMPLE_MQTT_TLS_SEC_TAG
+	int "Modem security tag for MQTT TLS credentials"
+	default 955
+	help
+	  Security tag where CA certificate chain is stored in modem NVM.
+
+config GNSS_SAMPLE_MQTT_TLS_PROVISION_CA_CERT
+	bool "Provision MQTT CA certificate from firmware on boot"
+	default y
+	help
+	  Writes/updates the CA chain in modem key storage before LTE
+	  connection starts.
+
+choice GNSS_SAMPLE_MQTT_TLS_CA_CERT_PROFILE
+	prompt "MQTT TLS CA certificate profile"
+	default GNSS_SAMPLE_MQTT_TLS_CA_CERT_PROFILE_MOSQUITTO
+	help
+	  Select which CA certificate chain is provisioned when TLS
+	  provisioning is enabled.
+
+config GNSS_SAMPLE_MQTT_TLS_CA_CERT_PROFILE_MOSQUITTO
+	bool "Mosquitto test broker CA"
+	help
+	  CA certificate chain matching test.mosquitto.org.
+
+config GNSS_SAMPLE_MQTT_TLS_CA_CERT_PROFILE_ISRG_ROOT_X1
+	bool "ISRG Root X1 (Let's Encrypt)"
+	help
+	  Root CA used by many public MQTT endpoints, including blynk.cloud.
+
+endchoice # GNSS_SAMPLE_MQTT_TLS_CA_CERT_PROFILE
+
+endif # GNSS_SAMPLE_MQTT_TLS_ENABLED
+
+config GNSS_SAMPLE_MQTT_BROKER_FALLBACK_ENABLED
+	bool "Enable MQTT broker fallback"
+	default y
+	help
+	  When enabled, firmware switches to a fallback broker after repeated
+	  MQTT connect timeouts.
+
+if GNSS_SAMPLE_MQTT_BROKER_FALLBACK_ENABLED
+
+config GNSS_SAMPLE_MQTT_BROKER_FALLBACK_HOSTNAME
+	string "Fallback MQTT broker hostname"
+	default "broker.hivemq.com"
+
+config GNSS_SAMPLE_MQTT_BROKER_FALLBACK_PORT
+	int "Fallback MQTT broker port"
+	range 1 65535
+	default 8883 if GNSS_SAMPLE_MQTT_TLS_ENABLED
+	default 1883
+
+config GNSS_SAMPLE_MQTT_FAILOVER_AFTER_TIMEOUTS
+	int "Failover after consecutive MQTT connect timeouts"
+	range 1 20
+	default 3
+
+endif # GNSS_SAMPLE_MQTT_BROKER_FALLBACK_ENABLED
+
+config GNSS_SAMPLE_MQTT_CLIENT_ID
+	string "MQTT client ID"
+	default "nrf9151-001"
+
+config GNSS_SAMPLE_MQTT_USERNAME
+	string "MQTT username (optional)"
+	default ""
+	help
+	  Optional MQTT username. For Blynk MQTT use "device".
+
+config GNSS_SAMPLE_MQTT_PASSWORD
+	string "MQTT password/token (optional)"
+	default ""
+	help
+	  Optional MQTT password/token. Leave empty to disable password auth.
+
+config GNSS_SAMPLE_MQTT_DEVICE_ID
+	string "Telemetry device ID"
+	default "nrf9151-001"
+
+config GNSS_SAMPLE_MQTT_TOPIC
+	string "MQTT telemetry topic"
+	default "devices/nrf9151-001/telemetry"
+
+config GNSS_SAMPLE_MQTT_SUBSCRIBE_TOPIC
+	string "MQTT subscribe topic (optional)"
+	default ""
+	help
+	  Optional topic subscription for downlink commands, for example
+	  "downlink/#" on Blynk MQTT.
+
+config GNSS_SAMPLE_MQTT_RETAIN_MESSAGES
+	bool "Publish MQTT telemetry with retain flag"
+	default n
+	help
+	  When enabled, the broker stores the last published telemetry payload
+	  on the topic and delivers it immediately to new subscribers.
+
+config GNSS_SAMPLE_MQTT_PUBLISH_INTERVAL_SECONDS
+	int "Minimum MQTT publish interval in seconds"
+	range 10 86400
+	default 60
+	help
+	  Minimum interval between MQTT publishes. Keep this conservative for
+	  limited NB-IoT SIM data volume.
+
+config GNSS_SAMPLE_MQTT_RETRY_BACKOFF_SECONDS
+	int "MQTT retry backoff in seconds"
+	range 10 3600
+	default 60
+
+config GNSS_SAMPLE_MQTT_REGISTRATION_TIMEOUT_SECONDS
+	int "NB-IoT registration status log interval in seconds"
+	range 10 3600
+	default 120
+
+config GNSS_SAMPLE_MQTT_SEARCH_RECOVERY_SECONDS
+	int "NB-IoT search recovery interval in seconds"
+	range 30 3600
+	default 240
+	help
+	  If LTE remains unregistered/searching for this long, the firmware
+	  will trigger an automatic offline/reconnect recovery cycle.
+
+config GNSS_SAMPLE_MQTT_CONNECT_TIMEOUT_SECONDS
+	int "MQTT connect timeout in seconds"
+	range 10 300
+	default 120
+	help
+	  Time to wait for CONNACK after MQTT connect attempt. NB-IoT links can
+	  be higher-latency than Wi-Fi/LTE-M, so use a conservative timeout.
+
+config GNSS_SAMPLE_MQTT_QUEUE_LEN
+	int "MQTT telemetry queue length"
+	range 1 8
+	default 2
+	help
+	  Number of valid-fix telemetry samples that can wait for MQTT. Oldest
+	  samples are dropped on overflow to avoid stale positions.
+
+config GNSS_SAMPLE_MQTT_BATTERY_PERCENT
+	int "Static battery percent included in MQTT JSON (-1 disables)"
+	range -1 100
+	default -1
+	help
+	  Placeholder for boards without a battery gauge wired yet. Set to -1
+	  to omit battery from compact MQTT JSON.
+
+config GNSS_SAMPLE_MQTT_STACK_SIZE
+	int "MQTT worker thread stack size"
+	default 4096
+
+config GNSS_SAMPLE_MQTT_THREAD_PRIORITY
+	int "MQTT worker thread priority"
+	default 7
+
+config GNSS_SAMPLE_TELEMETRY_SERVER_HOST
+	string "Telemetry server host (UDP/CoAP)"
+	default ""
+	help
+	  Backend host used for low-data request/response telemetry.
+
+config GNSS_SAMPLE_TELEMETRY_SERVER_PORT
+	int "Telemetry server port"
+	range 1 65535
+	default 9000
+
+config GNSS_SAMPLE_TELEMETRY_PROTOCOL
+	string "Telemetry protocol"
+	default "udp"
+	help
+	  Supported values in current implementation: udp, coap.
+
+config GNSS_SAMPLE_TELEMETRY_PUBLISH_INTERVAL_SECONDS
+	int "Telemetry interval in seconds"
+	range 30 86400
+	default 600
+
+config GNSS_SAMPLE_GNSS_TIMEOUT_SECONDS
+	int "GNSS timeout in seconds"
+	range 10 3600
+	default 60
+
+config GNSS_SAMPLE_DATA_MODE_DEFAULT
+	string "Default data mode"
+	default "auto"
+	help
+	  Supported values: auto, tn_only, ntn_only.
+
+config GNSS_SAMPLE_TN_ENABLED_DEFAULT
+	bool "Enable TN by default"
+	default y
+
+config GNSS_SAMPLE_NTN_ENABLED_DEFAULT
+	bool "Enable NTN fallback by default"
+	default y
+
+config GNSS_SAMPLE_TN_UNAVAILABLE_TIMEOUT_SECONDS
+	int "TN unavailable timeout in seconds"
+	range 60 86400
+	default 300
+	help
+	  TN is considered unavailable when registration/network failures
+	  persist this long continuously.
+
+config GNSS_SAMPLE_NTN_MIN_SEND_INTERVAL_SECONDS
+	int "Minimum NTN send interval in seconds"
+	range 300 2592000
+	default 3600
+	help
+	  Minimum spacing between NTN payload attempts to protect the low
+	  monthly NTN quota.
+
+config GNSS_SAMPLE_NTN_MAX_PAYLOAD_BYTES_DEFAULT
+	int "Maximum NTN payload size in bytes"
+	range 64 512
+	default 200
+
+config GNSS_SAMPLE_MONTHLY_NTN_BYTE_LIMIT_DEFAULT
+	int "Monthly NTN byte limit"
+	range 1024 500000
+	default 50000
+
+config GNSS_SAMPLE_CONFIG_VERSION_DEFAULT
+	int "Default configuration version"
+	range 0 100000
+	default 1
+
+config GNSS_SAMPLE_AUTH_TOKEN_DEFAULT
+	string "Default auth token/shared secret"
+	default ""
+
+config GNSS_SAMPLE_MAX_PAYLOAD_BYTES_DEFAULT
+	int "Default max payload bytes"
+	range 64 1200
+	default 300
+
+config GNSS_SAMPLE_ENABLE_DEBUG_LOGS_DEFAULT
+	bool "Enable debug logs by default"
+	default n
+
+config GNSS_SAMPLE_MQTT_SYNC_ENABLED
+	bool "Enable MQTT retained config sync"
+	default y
+
+config GNSS_SAMPLE_MQTT_SYNC_INTERVAL_SECONDS
+	int "MQTT config sync interval in seconds"
+	range 300 172800
+	default 21600
+
+config GNSS_SAMPLE_MQTT_SYNC_FORCE_IN_NTN
+	bool "Allow MQTT config sync in NTN mode"
+	default n
+
+config GNSS_SAMPLE_NTN_MIN_INTERVAL_SECONDS
+	int "Minimum telemetry interval in NTN mode"
+	range 300 86400
+	default 3600
+
+config GNSS_SAMPLE_TELEMETRY_BACKOFF_BASE_SECONDS
+	int "Base backoff for telemetry failures in seconds"
+	range 5 3600
+	default 60
+
+config GNSS_SAMPLE_TELEMETRY_BACKOFF_MAX_SECONDS
+	int "Maximum backoff for telemetry failures in seconds"
+	range 10 86400
+	default 3600
+
+endif # GNSS_SAMPLE_MQTT_NBIOT_ENABLED
+
+if GNSS_SAMPLE_ASSISTANCE_MINIMAL && GNSS_SAMPLE_LOW_ACCURACY
+
+config GNSS_SAMPLE_ASSISTANCE_REFERENCE_ALT
+	int "Reference altitude for 3-sat first fix in meters"
+	range -32767 32767
+	default -32767
+	help
+	  Reference altitude for 3-sat first fix in meters above the reference ellipsoid surface.
+	  The default value -32767 implies that reference altitude is not injected.
+
+endif # GNSS_SAMPLE_ASSISTANCE_MINIMAL && GNSS_SAMPLE_LOW_ACCURACY
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu
+
+module = GNSS_SAMPLE
+module-str = GNSS sample
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"

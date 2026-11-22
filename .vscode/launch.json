@@ -1,0 +1,26 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "nrf-connect",
+			"request": "launch",
+			"name": "Launch gnss/build",
+			"config": "${workspaceFolder}/build",
+			"runToEntryPoint": "main"
+		},
+		{
+			"type": "nrf-connect",
+			"request": "launch",
+			"name": "Launch gnss/build/gnss",
+			"config": "${workspaceFolder}/build/gnss",
+			"runToEntryPoint": "main"
+		},
+		{
+			"type": "nrf-connect",
+			"request": "launch",
+			"name": "Launch gnss/build/gnss/tfm",
+			"config": "${workspaceFolder}/build/gnss/tfm",
+			"runToEntryPoint": "main"
+		}
+	]
+}
