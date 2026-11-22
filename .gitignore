@@ -3,3 +3,4 @@ gradle
 target
 gradle.*
 android/.gradle/*
+*/android/.gradle/*
